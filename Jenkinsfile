@@ -1,51 +1,44 @@
 pipeline {
     agent any
-
     environment {
-        AWS_ACCESS_KEY_ID = 'YOUR_ACCESS_KEY'
-        AWS_SECRET_ACCESS_KEY = 'YOUR_SECRET_KEY'
-        AWS_DEFAULT_REGION = 'us-east-1'
+        AWS_ACCESS_KEY_ID     = credentials('aws_access_key_id')
+        AWS_SECRET_ACCESS_KEY = credentials('aws_secret_access_key')
+        AWS_DEFAULT_REGION    = 'us-east-1'
     }
-
     stages {
-        stage('Checkout') {
+        stage('Checkout SCM') {
             steps {
-                git branch: 'main', url: 'https://github.com/maatoot/EKS.git'
+                checkout scm
             }
         }
-
+        stage('Terraform Init') {
+            steps {
+                sh 'terraform init -input=false -reconfigure'
+            }
+        }
+        stage('Terraform Plan') {
+            steps {
+                sh 'terraform plan -out=tfplan -input=false'
+            }
+        }
+        stage('Terraform Apply') {
+            steps {
+                sh 'terraform apply -input=false tfplan'
+            }
+        }
         stage('Terraform Destroy') {
             steps {
                 sh 'terraform destroy -auto-approve'
             }
         }
-
-        stage('Terraform Init') {
-            steps {
-                sh 'terraform init'
-            }
-        }
-
-        stage('Terraform Plan') {
-            steps {
-                sh 'terraform plan'
-            }
-        }
-
-        stage('Terraform Apply') {
-            steps {
-                sh 'terraform apply -auto-approve'
-            }
-        }
     }
-
     post {
         always {
-            echo 'Pipeline finished!'
             sh 'terraform fmt -check || true'
+            echo "Pipeline finished!"
         }
         failure {
-            echo 'Terraform pipeline failed!'
+            echo "Terraform pipeline failed!"
         }
     }
 }
