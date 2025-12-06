@@ -34,11 +34,17 @@ pipeline {
     }
     post {
         always {
-            sh 'terraform fmt -check || true'
-            echo "Pipeline finished!"
+            node {
+                script {
+                    sh 'terraform fmt -check || true'
+                    echo "Pipeline finished!"
+                }
+            }
         }
         failure {
-            echo "Terraform pipeline failed!"
+            node {
+                echo "Terraform pipeline failed!"
+            }
         }
     }
 }
