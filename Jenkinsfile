@@ -3,15 +3,15 @@ pipeline {
 
     environment {
         AWS_REGION       = 'us-east-1'
-        S3_BUCKET        = 'my-terraform-state-bucket'    // غيّر للاسم بتاعك
-        DYNAMO_TABLE     = 'terraform-lock-table'        // غيّر للاسم بتاعك
+        S3_BUCKET        = 'my-terraform-state-bucket'   
+        DYNAMO_TABLE     = 'terraform-lock-table'        
         TERRAFORM_DIR    = 'terraform'                   // المجلد اللي فيه ملفات tf
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git url: 'https://github.com/username/repo.git', branch: 'main'
+                git url: 'https://github.com/maatoot/EKS.git', branch: 'main'
             }
         }
 
