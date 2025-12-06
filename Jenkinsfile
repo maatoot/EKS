@@ -16,7 +16,7 @@ pipeline {
             steps {
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws_creds'  // تأكد إن الـ ID موجود فعلاً
+                    credentialsId: 'aws_creds'
                 ]]) {
                     sh 'terraform init -input=false'
                     sh 'terraform destroy -auto-approve'
@@ -60,7 +60,7 @@ pipeline {
 
     post {
         always {
-            node {  // مهم جداً عشان الـ sh يكون داخل node context
+            script {
                 sh 'terraform fmt -check'
                 echo "Terraform pipeline finished!"
             }
