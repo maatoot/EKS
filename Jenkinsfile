@@ -2,43 +2,41 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION       = 'us-east-1'
-        S3_BUCKET        = 'my-terraform-state-bucket'   
-        DYNAMO_TABLE     = 'terraform-lock-table'        
-        TERRAFORM_DIR    = 'terraform'                   // المجلد اللي فيه ملفات tf
+        AWS_REGION = 'us-east-1'
+        AWS_PROFILE = 'jenkins' // اسم profile لو عامل configure في /var/lib/jenkins/.aws/credentials
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git url: 'https://github.com/maatoot/EKS.git', branch: 'main'
+                git branch: 'main', url: 'https://github.com/maatoot/EKS.git'
             }
         }
 
         stage('Setup Terraform Backend') {
             steps {
-                script {
-                    sh """
-                    mkdir -p ${TERRAFORM_DIR}
-                    cat > ${TERRAFORM_DIR}/backend.tf <<EOL
-                    terraform {
-                      backend "s3" {
-                        bucket         = "${S3_BUCKET}"
-                        key            = "terraform.tfstate"
-                        region         = "${AWS_REGION}"
-                        dynamodb_table = "${DYNAMO_TABLE}"
-                        encrypt        = true
-                      }
-                    }
-                    EOL
-                    """
+                dir('terraform') { // لو ملفاتك في مجلد terraform
+                    sh '''
+                        mkdir -p .terraform
+                        cat <<EOF > backend.tf
+terraform {
+  backend "s3" {
+    bucket         = "your-terraform-state-bucket"
+    key            = "terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "terraform-lock-table"
+    encrypt        = true
+  }
+}
+EOF
+                    '''
                 }
             }
         }
 
         stage('Terraform Init') {
             steps {
-                dir("${TERRAFORM_DIR}") {
+                dir('terraform') {
                     sh 'terraform init -input=false'
                 }
             }
@@ -46,17 +44,16 @@ pipeline {
 
         stage('Terraform Plan') {
             steps {
-                dir("${TERRAFORM_DIR}") {
-                    sh 'terraform plan -out=tfplan'
+                dir('terraform') {
+                    sh 'terraform plan'
                 }
             }
         }
 
         stage('Terraform Apply') {
             steps {
-                dir("${TERRAFORM_DIR}") {
-                    input message: "Apply Terraform changes?"
-                    sh 'terraform apply -input=false tfplan'
+                dir('terraform') {
+                    sh 'terraform apply -auto-approve'
                 }
             }
         }
@@ -64,15 +61,15 @@ pipeline {
 
     post {
         always {
-            dir("${TERRAFORM_DIR}") {
+            dir('terraform') {
                 sh 'terraform fmt'
             }
         }
-        success {
-            echo 'Terraform applied successfully!'
-        }
         failure {
             echo 'Terraform failed!'
+        }
+        success {
+            echo 'Terraform applied successfully!'
         }
     }
 }
