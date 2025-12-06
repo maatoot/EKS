@@ -2,45 +2,36 @@ pipeline {
     agent any
 
     environment {
-        AWS_DEFAULT_REGION = 'us-east-1'
+        // حط الـ Jenkins credentials IDs المناسبة
+        AWS_ACCESS_KEY_ID     = credentials('aws_access_key_id')      // ID للـ access key
+        AWS_SECRET_ACCESS_KEY = credentials('aws_secret_access_key')  // ID للـ secret key
+        AWS_DEFAULT_REGION    = 'us-east-1'  // غير الريجون حسب الحاجة
+    }
+
+    options {
+        // يمنع أكثر من build شغال في نفس الوقت
+        skipDefaultCheckout(true)
+        timestamps()
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git url: 'https://github.com/maatoot/EKS.git', branch: 'main'
-            }
-        }
-
-        stage('Terraform Destroy') {
-            steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws_creds'
-                ]]) {
-                    sh 'terraform init -input=false'
-                    sh 'terraform destroy -auto-approve'
-                }
+                checkout scm
             }
         }
 
         stage('Terraform Init') {
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws_creds'
-                ]]) {
-                    sh 'terraform init -input=false'
+                dir('.') {  // لو main.tf في root
+                    sh 'terraform init'
                 }
             }
         }
 
         stage('Terraform Plan') {
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws_creds'
-                ]]) {
+                dir('.') {
                     sh 'terraform plan -out=tfplan'
                 }
             }
@@ -48,11 +39,16 @@ pipeline {
 
         stage('Terraform Apply') {
             steps {
-                withCredentials([[
-                    $class: 'AmazonWebServicesCredentialsBinding',
-                    credentialsId: 'aws_creds'
-                ]]) {
+                dir('.') {
                     sh 'terraform apply -auto-approve tfplan'
+                }
+            }
+        }
+
+        stage('Terraform Format Check') {
+            steps {
+                dir('.') {
+                    sh 'terraform fmt -check'
                 }
             }
         }
@@ -60,10 +56,10 @@ pipeline {
 
     post {
         always {
-            script {
-                sh 'terraform fmt -check'
-                echo "Terraform pipeline finished!"
-            }
+            echo "Pipeline finished!"
+        }
+        success {
+            echo "Terraform ran successfully."
         }
         failure {
             echo "Terraform pipeline failed!"
