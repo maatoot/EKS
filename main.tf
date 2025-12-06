@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     environment {
-        AWS_ACCESS_KEY_ID     = credentials('aws_creds_id')   // غير 'aws_creds_id' بالـ ID بتاع credentials اللي عاملها في Jenkins
-        AWS_SECRET_ACCESS_KEY = credentials('aws_creds_secret')
+        AWS_ACCESS_KEY_ID     = credentials('aws_access_key')     // ID credential بتاع الـ access key
+        AWS_SECRET_ACCESS_KEY = credentials('aws_secret_key')     // ID credential بتاع الـ secret key
         AWS_DEFAULT_REGION    = 'us-east-1'
         TERRAFORM_DIR         = 'terraform'
     }
