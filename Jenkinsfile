@@ -2,58 +2,50 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = 'us-east-1'
-        AWS_PROFILE = 'jenkins' // اسم profile لو عامل configure في /var/lib/jenkins/.aws/credentials
+        AWS_DEFAULT_REGION = 'us-east-1'
     }
 
     stages {
-        stage('Checkout') {
+        stage('Terraform Destroy') {
             steps {
-                git branch: 'main', url: 'https://github.com/maatoot/EKS.git'
-            }
-        }
-
-        stage('Setup Terraform Backend') {
-            steps {
-                dir('terraform') { // لو ملفاتك في مجلد terraform
-                    sh '''
-                        mkdir -p .terraform
-                        cat <<EOF > backend.tf
-terraform {
-  backend "s3" {
-    bucket         = "your-terraform-state-bucket"
-    key            = "terraform.tfstate"
-    region         = "us-east-1"
-    dynamodb_table = "terraform-lock-table"
-    encrypt        = true
-  }
-}
-EOF
-                    '''
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws_creds']]) {
+                    dir('terraform') {
+                        sh '''
+                            echo "Running Terraform Destroy..."
+                            terraform init -input=false
+                            terraform destroy -auto-approve
+                        '''
+                    }
                 }
             }
         }
 
         stage('Terraform Init') {
             steps {
-                dir('terraform') {
-                    sh 'terraform init -input=false'
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws_creds']]) {
+                    dir('terraform') {
+                        sh 'terraform init -input=false'
+                    }
                 }
             }
         }
 
         stage('Terraform Plan') {
             steps {
-                dir('terraform') {
-                    sh 'terraform plan'
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws_creds']]) {
+                    dir('terraform') {
+                        sh 'terraform plan -out=tfplan'
+                    }
                 }
             }
         }
 
         stage('Terraform Apply') {
             steps {
-                dir('terraform') {
-                    sh 'terraform apply -auto-approve'
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws_creds']]) {
+                    dir('terraform') {
+                        sh 'terraform apply -auto-approve tfplan'
+                    }
                 }
             }
         }
@@ -66,10 +58,10 @@ EOF
             }
         }
         failure {
-            echo 'Terraform failed!'
+            echo "Terraform pipeline failed!"
         }
         success {
-            echo 'Terraform applied successfully!'
+            echo "Terraform pipeline completed successfully!"
         }
     }
 }
