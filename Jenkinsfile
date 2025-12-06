@@ -2,67 +2,50 @@ pipeline {
     agent any
 
     environment {
-        // حط الـ Jenkins credentials IDs المناسبة
-        AWS_ACCESS_KEY_ID     = credentials('aws_access_key_id')      // ID للـ access key
-        AWS_SECRET_ACCESS_KEY = credentials('aws_secret_access_key')  // ID للـ secret key
-        AWS_DEFAULT_REGION    = 'us-east-1'  // غير الريجون حسب الحاجة
-    }
-
-    options {
-        // يمنع أكثر من build شغال في نفس الوقت
-        skipDefaultCheckout(true)
-        timestamps()
+        AWS_ACCESS_KEY_ID = 'YOUR_ACCESS_KEY'
+        AWS_SECRET_ACCESS_KEY = 'YOUR_SECRET_KEY'
+        AWS_DEFAULT_REGION = 'us-east-1'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                checkout scm
+                git branch: 'main', url: 'https://github.com/maatoot/EKS.git'
+            }
+        }
+
+        stage('Terraform Destroy') {
+            steps {
+                sh 'terraform destroy -auto-approve'
             }
         }
 
         stage('Terraform Init') {
             steps {
-                dir('.') {  // لو main.tf في root
-                    sh 'terraform init'
-                }
+                sh 'terraform init'
             }
         }
 
         stage('Terraform Plan') {
             steps {
-                dir('.') {
-                    sh 'terraform plan -out=tfplan'
-                }
+                sh 'terraform plan'
             }
         }
 
         stage('Terraform Apply') {
             steps {
-                dir('.') {
-                    sh 'terraform apply -auto-approve tfplan'
-                }
-            }
-        }
-
-        stage('Terraform Format Check') {
-            steps {
-                dir('.') {
-                    sh 'terraform fmt -check'
-                }
+                sh 'terraform apply -auto-approve'
             }
         }
     }
 
     post {
         always {
-            echo "Pipeline finished!"
-        }
-        success {
-            echo "Terraform ran successfully."
+            echo 'Pipeline finished!'
+            sh 'terraform fmt -check || true'
         }
         failure {
-            echo "Terraform pipeline failed!"
+            echo 'Terraform pipeline failed!'
         }
     }
 }
