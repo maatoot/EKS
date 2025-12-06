@@ -1,55 +1,63 @@
-# main.tf
+pipeline {
+    agent any
 
-terraform {
-  required_version = ">= 1.5.0"
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = ">= 5.0"
+    environment {
+        AWS_ACCESS_KEY_ID     = credentials('aws_creds_id')   // غير 'aws_creds_id' بالـ ID بتاع credentials اللي عاملها في Jenkins
+        AWS_SECRET_ACCESS_KEY = credentials('aws_creds_secret')
+        AWS_DEFAULT_REGION    = 'us-east-1'
+        TERRAFORM_DIR         = 'terraform'
     }
-  }
 
-  backend "s3" {
-    bucket         = "my-terraform-state-bucket"  # غيّر الاسم لو مطلوب
-    key            = "terraform.tfstate"
-    region         = "us-east-1"
-    dynamodb_table = "terraform-locks"
-    encrypt        = true
-  }
-}
+    stages {
+        stage('Checkout') {
+            steps {
+                git url: 'https://github.com/maatoot/EKS.git', branch: 'main'
+            }
+        }
 
-provider "aws" {
-  region = "us-east-1"
-}
+        stage('Terraform Destroy') {
+            steps {
+                dir("${TERRAFORM_DIR}") {
+                    sh 'terraform init -input=false'
+                    sh 'terraform destroy -auto-approve'
+                }
+            }
+        }
 
-# S3 bucket لإنشاء الباكيند لو مش موجود
-resource "aws_s3_bucket" "terraform_state" {
-  bucket = "my-terraform-state-bucket"  # نفس الاسم في backend
-  acl    = "private"
+        stage('Terraform Init') {
+            steps {
+                dir("${TERRAFORM_DIR}") {
+                    sh 'terraform init -input=false'
+                }
+            }
+        }
 
-  versioning {
-    enabled = true
-  }
+        stage('Terraform Plan') {
+            steps {
+                dir("${TERRAFORM_DIR}") {
+                    sh 'terraform plan -out=tfplan'
+                }
+            }
+        }
 
-  tags = {
-    Name        = "TerraformStateBucket"
-    Environment = "Dev"
-  }
-}
+        stage('Terraform Apply') {
+            steps {
+                dir("${TERRAFORM_DIR}") {
+                    sh 'terraform apply -auto-approve tfplan'
+                }
+            }
+        }
+    }
 
-# DynamoDB table لتأمين state locking
-resource "aws_dynamodb_table" "terraform_locks" {
-  name         = "terraform-locks"  # نفس الاسم في backend
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "LockID"
-
-  attribute {
-    name = "LockID"
-    type = "S"
-  }
-
-  tags = {
-    Name        = "TerraformLocks"
-    Environment = "Dev"
-  }
+    post {
+        always {
+            dir("${TERRAFORM_DIR}") {
+                sh 'terraform fmt -check'
+            }
+            echo "Terraform pipeline finished!"
+        }
+        failure {
+            echo "Terraform pipeline failed!"
+        }
+    }
 }
